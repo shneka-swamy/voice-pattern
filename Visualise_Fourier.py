@@ -13,7 +13,7 @@ from scipy.io import wavfile
 import numpy as np
 import os
 import plot_graph as pg
-
+import math
 
 class Plotting:
     def plot_handling(self):
@@ -99,7 +99,6 @@ class Plotting:
 
     # Checks if the imaginary part is zero and converts it to a list of real numbers
     def convert_to_real(self, y):
-        # TODO: Must include assert statement later
         y_real = []
         for value in y:
             y_real.append(value.real)
@@ -107,31 +106,40 @@ class Plotting:
 
     # Converts the fourier wave back to original wave 
     # TODO: Play this back and see the changes 	
-    def inverse_fft_plot(self, samples, sampling_rate, g_obj):
-        y = scipy.fft.ifft(samples)
-        #self.plot_with_imaginary(y) 	
-        y_real = self.convert_to_real(y)	
+    def find_inverse_fft(self, samples, sampling_rate):
+        return scipy.fft.ifft(samples)		
 
-        #g_obj.set_labels(['Amplitude'], ['Time in sec'], 'Inverse Fourier to the original wave')
-        #g_obj.plot_graph([y], mode= 'Final')
+    # Frequency bins with amplitude and phase
+    # TODO: Is there an advantage to convert anngle to degree instead of rad ??
+    def get_freq_amp(self, yf):
+        return np.abs(yf), np.angle(yf)
 
-        return y_real 
+    def get_real_imag(self, ampl, phase):
+        assert len(ampl) == len(phase), "Error in conversion to amplitude and phase"
+        calc_val = []
+        for i in range(0, len(ampl)):
+            calc_val.append(complex(ampl[i]*math.cos(phase[i]), ampl[i]*math.sin(phase[i])))
+        return calc_val
+    
+    def ampl_phase_back(self, y):
+        ampl, phase = self.get_freq_amp(y)
+        value = self.get_real_imag(ampl, phase)
+        return ampl, phase, value
 
     # Converts the amplitude of the wave to frequency
-    def fft_plot(self, samples, sampling_rate, g_obj):
+    def find_fft(self, samples, sampling_rate):
         n = len(samples)
         T = 1/ sampling_rate
         yf = scipy.fft.fft(samples)
-        #print("Printing the fourier transform", yf[:50])
-
         y = yf[:n//2 + 1] 
+
+        # Check if frequency and amplitude function is working
+        ampl, phase, _ = self.ampl_phase_back(y)
+        #y = self.get_real_imag(amplitude, phase)
+
         # //2 is removed for testing purpose
         xf = np.linspace(0.0, 1.0/(2.0*T), n)
-        #y = 2.0/n * np.abs(yf[:n])
-
-        g_obj.set_labels(['Frequency'],['Amplitude'], 'Fourier Transform Wave')
-        g_obj.plot_graph([yf], mode = 'Final')	
-            
+        #y = 2.0/n * np.abs(yf[:n//2])            
         return xf, y, yf
 
     # This function is used to generate a sine wave with frequency 440 Hz 
@@ -162,37 +170,42 @@ class Plotting:
                 print(str(i) +  " " + str(x[i]) + " "+  str(y[i]) + "Error found")
                 break
 
-    def decrement_value(self, y):
-        for i in range(0, len(y)):
-            y[i] -= 0.0001	
-        return y
-
 # TODO: Low pass filter, High pass filter, Curve fitting (Linear and non linear)
 # TODO: Fourier of a Fourier and see the graph that it produces
 # TODO: Effect of ----- (check in the notes)
 
-def main():
+def check_fft_ifft():
     p = Plotting()
-    g_obj = pg.Graphs()
-
-    p.generate_sine_wav()
-
     samples, sampling_rate = p.plot_handling()
     duration_of_sound = len(samples)/ sampling_rate
     print(samples.dtype, min(samples))
-
     p.fft_plot_generation(samples, sampling_rate)
-    xf, y, y_extra = p.fft_plot(samples, sampling_rate, g_obj)
+    xf, y, y_extra = p.find_fft(samples, sampling_rate)
     yf = p.repeat_value(y)
 
-    p.compare_values(y_extra, yf, 0.001)
-    g_obj.plot_graph([y_extra, yf], divisions= 2)
+    return y_extra, yf
 
-    y_inv = p.inverse_fft_plot(yf, sampling_rate, g_obj)
-    
+# Remember only one g.obj per function
+def main():
+    g_obj = pg.Graphs()
+    p = Plotting()
+
+    #TODO: This section of the code must be changed
+    samples, sampling_rate = p.plot_handling()
+    p.generate_sine_wav()
+    y_extra, yf = check_fft_ifft()
+    p.plot_with_imaginary(yf)
+
+    #g_obj.plot_graph([y_extra, yf], divisions= 2)
+
+    y = p.find_inverse_fft(yf, sampling_rate)
+    y_inv  = p.convert_to_real(y)
+    g_obj.set_labels(['Amplitude'], ['Time in sec'], 'Inverse Fourier to the original wave')
+    g_obj.plot_graph([y_inv], mode= 'Final')
+    print(y[:50])
+
     # TODO: This part must be checked with the actual code implemented
     y_np_array = np.array(y_inv, np.float32)
-    #y_np_array = p.decrement_value(y_np_array)	
 
     g_obj.plot_graph([samples, y_np_array], divisions= 2)
     p.compare_values(samples, y_np_array)
@@ -205,7 +218,6 @@ def main():
     # Calling low pass and high pass filter
     #p.low_pass_filter(xf, y, g_obj)
     #p.high_pass_filter(xf, y, g_obj)
-
 
 if __name__ == '__main__':
     main()
