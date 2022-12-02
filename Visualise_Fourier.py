@@ -22,18 +22,6 @@ class Plotting:
                                               offset = 0.0, duration = None)
         return samples, sampling_rate
     
-    # Calculates general average -- no weights considered
-    def calc_average(self, x_axis, y_axis):
-        maximum = max(y_axis)
-        minimum = min(y_axis)
-        average = (maximum + minimum)/2
-
-        return average
-    
-    # TODO: Can weighted average be calculated and what will be the difference
-    def weighted_average(self, x_axis, y_axis):
-        pass
-
     # This plot generation is specific to fft and hence cannot be converted to generalised form
     def fft_plot_generation(self, samples, sampling_rate):
         plt.figure()
@@ -43,51 +31,11 @@ class Plotting:
         plt.title("Actual voice data representation")
         plt.show()
 
-    # Implements a low pass filter to understand the effect of this frequencies in voice
-    def low_pass_filter(self, x_axis, y_axis, g_obj):
-        x_select = []
-        y_select = []
-
-        average = self.calc_average(x_axis, y_axis)
-        print("value of average is ", average)
-        for i in range(0, len(y_axis)):
-            if y_axis[i] <= average:
-                x_select.append(x_axis[i])
-                y_select.append(y_axis[i])
-
-        print("Selected length", len(x_select), len(y_select))
-        print("Actual length", len(x_axis), len(y_axis))
-
-        g_obj.set_labels(['Frequency'],['Amplitude'], 'Low pass Filter')
-        g_obj.plot_graph([y_select], x_list=[x_select], mode='Final')
-
-    # Implements a high pass filter to understand the effect of high frequencies 
-    def high_pass_filter(self, x_axis, y_axis, g_obj):
-        x_select = []
-        y_select = []
-
-        average = self.calc_average(x_axis, y_axis)
-        for i in range(0, len(y_axis)):
-            if y_axis[i] >= average:
-                x_select.append(x_axis[i])
-                y_select.append(y_axis[i])
-
-        print("Selected length", len(x_select), len(y_select))
-        print("Actual length", len(x_axis), len(y_axis))
-
-        g_obj.set_labels(['Frequency'],['Amplitude'], 'High pass Filter')
-        g_obj.plot_graph([y_select], x_list=[x_select], mode='Final')
-
-    # Implements the effects of removing very high and very low frequencies	
-    def band_pass_filter(self, x_axis, y_axis, g_obj):
-        pass
-
     # TODO: Check if the symmentry exist in all Fourier waves. 
     # TODO: Postulate as to why this symmnetry exist and how we can use to our advantage
     def check_symmentry(self, amplitude):
         pass
     
-
     # The inverse fourier transform has imaginary numbers 
     # Viewing to make sure that the imaginary value is always a zero
     def plot_with_imaginary(self, y):
@@ -111,7 +59,7 @@ class Plotting:
 
     # Frequency bins with amplitude and phase
     # TODO: Is there an advantage to convert anngle to degree instead of rad ??
-    def get_freq_amp(self, yf):
+    def get_amp_phase(self, yf):
         return np.abs(yf), np.angle(yf)
 
     def get_real_imag(self, ampl, phase):
@@ -120,9 +68,34 @@ class Plotting:
         for i in range(0, len(ampl)):
             calc_val.append(complex(ampl[i]*math.cos(phase[i]), ampl[i]*math.sin(phase[i])))
         return calc_val
-    
+
+    def get_real_imag_freq(self, ampl, freq, phase):  
+        #g_obj = pg.Graphs()
+        #g_obj.plot_graph([frequency]) 
+
+        print("Amplitude: ", len(ampl))
+        print("Frequency: ", len(freq))
+        assert len(ampl) == len(freq), "Error in conversion to amplitude and frequency"
+        calc_val = []
+        N = (len(ampl) - 1) * 2
+        for i in range(0, len(ampl)):
+            calc_val.append(complex(ampl[i]*math.cos(2*math.pi*i*freq[i]/N + phase[i]), -ampl[i]*math.sin(2*math.pi*i*freq[i]/N) + phase[i]))
+        return calc_val 
+
+    def ampl_freq_back(self, y, N, T):
+        ampl, phase = self.get_amp_phase(y)
+        frequency = scipy.fft.fftfreq(N, T)[:N//2 + 1]
+        value = self.get_real_imag_freq(ampl, frequency, phase)
+        return ampl, frequency, value
+
     def ampl_phase_back(self, y):
-        ampl, phase = self.get_freq_amp(y)
+        g_obj = pg.Graphs()
+        ampl, phase = self.get_amp_phase(y)
+        phase_degree = []
+        for val in phase:
+            phase_degree.append(math.degrees(val))
+        g_obj.plot_graph([ampl])
+        #g_obj.plot_graph([phase_degree])
         value = self.get_real_imag(ampl, phase)
         return ampl, phase, value
 
@@ -130,13 +103,10 @@ class Plotting:
     def find_fft(self, samples, sampling_rate):
         n = len(samples)
         T = 1/ sampling_rate
+        print("Length of the actual song" + str(len(samples)))
         yf = scipy.fft.fft(samples)
+        print("Length after Fourier" + str(len(yf)))
         y = yf[:n//2 + 1] 
-
-        # Check if frequency and amplitude function is working
-        ampl, phase, _ = self.ampl_phase_back(y)
-        #y = self.get_real_imag(amplitude, phase)
-
         # //2 is removed for testing purpose
         xf = np.linspace(0.0, 1.0/(2.0*T), n)
         #y = 2.0/n * np.abs(yf[:n//2])            
@@ -162,24 +132,15 @@ class Plotting:
             index -= 1
         return y_new
 
-    # Compares to see if two float values are same
-    def compare_values(self, x, y, epi = 0.001):
-        assert len(x) == len(y), "Error in the length of the data"
-        for i in range(0, len(x)):
-            if np.abs(x[i] - y[i]) > epi:
-                print(str(i) +  " " + str(x[i]) + " "+  str(y[i]) + "Error found")
-                break
-
-# TODO: Low pass filter, High pass filter, Curve fitting (Linear and non linear)
-# TODO: Fourier of a Fourier and see the graph that it produces
-# TODO: Effect of ----- (check in the notes)
-
 def check_fft_ifft():
     p = Plotting()
     samples, sampling_rate = p.plot_handling()
-    duration_of_sound = len(samples)/ sampling_rate
-    print(samples.dtype, min(samples))
-    p.fft_plot_generation(samples, sampling_rate)
+    
+    # TODO: What is the use of duration of sound and xf?
+    #duration_of_sound = len(samples)/ sampling_rate
+    #print(samples.dtype, min(samples))
+    #p.fft_plot_generation(samples, sampling_rate)
+    
     xf, y, y_extra = p.find_fft(samples, sampling_rate)
     yf = p.repeat_value(y)
 
@@ -192,32 +153,27 @@ def main():
 
     #TODO: This section of the code must be changed
     samples, sampling_rate = p.plot_handling()
-    p.generate_sine_wav()
-    y_extra, yf = check_fft_ifft()
-    p.plot_with_imaginary(yf)
+    y_extra, yf  = check_fft_ifft()
+    print(sampling_rate)
 
+    #p.generate_sine_wav()
+    #p.plot_with_imaginary(yf)  
     #g_obj.plot_graph([y_extra, yf], divisions= 2)
 
     y = p.find_inverse_fft(yf, sampling_rate)
     y_inv  = p.convert_to_real(y)
-    g_obj.set_labels(['Amplitude'], ['Time in sec'], 'Inverse Fourier to the original wave')
-    g_obj.plot_graph([y_inv], mode= 'Final')
-    print(y[:50])
-
+ 
+    #g_obj.set_labels(['Amplitude'], ['Time in sec'], 'Inverse Fourier to the original wave')
+    #g_obj.plot_graph([y_inv], mode= 'Final')
+  
     # TODO: This part must be checked with the actual code implemented
     y_np_array = np.array(y_inv, np.float32)
 
-    g_obj.plot_graph([samples, y_np_array], divisions= 2)
-    p.compare_values(samples, y_np_array)
-
+    #g_obj.plot_graph([samples, y_np_array], divisions= 2)
     print(y_np_array.dtype, min(y_np_array))
 
     # To write to a file 
-    wavfile.write('songs/InverseFourier.wav', sampling_rate, y_np_array)
-
-    # Calling low pass and high pass filter
-    #p.low_pass_filter(xf, y, g_obj)
-    #p.high_pass_filter(xf, y, g_obj)
+    wavfile.write('songs/InverseFourier.wav', sampling_rate, samples)
 
 if __name__ == '__main__':
     main()
