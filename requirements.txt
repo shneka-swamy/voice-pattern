@@ -1,0 +1,7 @@
+soundfile
+scipy
+tqdm
+numpy
+matplotlib
+argparse
+glob
