@@ -1,5 +1,6 @@
 # This code aims to verify over varieds voice signals
 # if all the signals are real valued and even
+# http://www.openslr.org/12
 
 import glob
 import argparse
